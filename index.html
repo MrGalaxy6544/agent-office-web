@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>IT Agent Ops Floor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: isometric holo-floor (canvas) left; command console + roster + task board right; task detail slides over the floor. */
+:root{
+  color-scheme: dark;
+  --bg:#060a11; --panel:#0b121d; --panel-2:#0f1826; --line:#1a2638; --line-2:#24364f;
+  --fg:#d9e5f3; --muted:#6e819e; --soft:#b3c3d8;
+  --ok:#5cf2a6; --warn:#ffcb5c; --crit:#ff4d6a; --sync:#c9a8ff; --net:#3ee0ff;
+  --f-display:"Chakra Petch","IBM Plex Sans Thai",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.55}
+[hidden]{display:none!important}
+.app{min-height:100%;display:flex;flex-direction:column;gap:14px;padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 20px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.logo{width:38px;height:38px;flex:none;border:1px solid var(--line);border-radius:10px;display:grid;place-items:center;background:radial-gradient(circle at 50% 40%,rgba(62,224,255,.25),transparent 70%)}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:.06em;margin:0;line-height:1.1}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:12.5px}
+.meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.chip{font-family:var(--f-mono);font-size:12px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 11px;display:inline-flex;align-items:center;gap:7px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip b{font-weight:500;color:var(--fg)} .chip span{color:var(--muted)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)} .dot.off{background:var(--crit);box-shadow:0 0 8px var(--crit)}
+button{font:inherit;color:inherit}
+.btn{font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.04em;color:var(--fg);background:var(--panel-2);border:1px solid var(--line-2);border-radius:8px;padding:7px 13px;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center}
+.btn:hover{border-color:#36557a;background:#132034}
+.btn:focus-visible,.card:focus-visible,.task-item:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible,.ex:focus-visible{outline:2px solid var(--net);outline-offset:2px}
+.btn.primary{background:linear-gradient(180deg,#1d6f8a,#11475b);border-color:#3ee0ff88;color:#eafcff}
+.btn.primary:disabled{opacity:.45;cursor:not-allowed}
+.btn.warn{background:rgba(255,203,92,.12);border-color:rgba(255,203,92,.55);color:#ffe7b0}
+.btn.sm{font-size:11.5px;padding:4px 9px;border-radius:6px}
+.btn.danger{color:#ffd3dc;border-color:rgba(255,77,106,.45)}
+.main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 410px;gap:14px;min-height:0}
+.stage{position:relative;border:1px solid var(--line);border-radius:14px;background:radial-gradient(ellipse at 50% 55%,rgba(30,90,140,.22),transparent 65%),linear-gradient(180deg,#070d17,#05080e);overflow:hidden;min-height:480px;height:clamp(480px,calc(100vh - 110px),900px)}
+.stage canvas{display:block;width:100%;height:100%;cursor:pointer}
+.corner{position:absolute;right:14px;top:12px;font-family:var(--f-mono);font-size:11px;color:var(--muted);text-align:right;pointer-events:none;letter-spacing:.06em}
+aside.rail{display:flex;flex-direction:column;gap:14px;min-width:0}
+.panel{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:12px;min-width:0}
+.sec-h{font-family:var(--f-display);font-weight:600;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.sec-h small{font-family:var(--f-mono);letter-spacing:0;text-transform:none;font-size:11px}
+.cmd-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.cmd-row label{font-size:12px;color:var(--muted);white-space:nowrap;min-width:72px}
+select,input[type=text],input[type=password]{flex:1;min-width:0;width:100%;background:var(--panel-2);color:var(--fg);border:1px solid var(--line-2);border-radius:8px;padding:7px 9px;font:inherit;font-size:13px}
+textarea{width:100%;resize:vertical;min-height:84px;background:#070d17;color:var(--fg);border:1px solid var(--line-2);border-radius:9px;padding:10px 11px;font:inherit;font-size:13.5px;line-height:1.5}
+textarea::placeholder,input::placeholder{color:#4e607b}
+.mode{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+.mode label{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line-2);border-radius:8px;padding:7px 9px;cursor:pointer;font-size:12px;color:var(--soft)}
+.mode label b{display:block;font-family:var(--f-display);letter-spacing:.06em;color:var(--fg);font-size:12.5px}
+.mode input{margin-top:3px;accent-color:#3ee0ff}
+.mode label:has(input:checked){border-color:#3ee0ff88;background:rgba(62,224,255,.06)}
+.mode label.power:has(input:checked){border-color:rgba(255,79,163,.6);background:rgba(255,79,163,.07)}
+.cmd-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.hint{font-size:11.5px;color:var(--muted);min-width:0}
+.examples{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.ex{font-size:11.5px;border:1px dashed var(--line-2);background:transparent;border-radius:999px;padding:3px 10px;color:var(--soft);cursor:pointer}
+.notice{font-size:12px;color:#ffe2a8;background:rgba(255,203,92,.08);border:1px solid rgba(255,203,92,.3);border-radius:8px;padding:8px 10px}
+.roster{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.card{--c:var(--net);display:flex;flex-direction:column;gap:3px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);cursor:pointer;text-align:left;min-width:0}
+.card.sel{border-color:color-mix(in srgb,var(--c) 65%,transparent);background:linear-gradient(135deg,color-mix(in srgb,var(--c) 12%,transparent),var(--panel-2) 70%)}
+.card .r1{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.nm{font-family:var(--f-display);font-weight:700;font-size:13.5px;letter-spacing:.08em;color:var(--c)}
+.role,.task{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.task{font-size:11.5px;color:var(--soft)}
+.pill{font-family:var(--f-mono);font-size:10px;padding:1px 7px;border-radius:999px;border:1px solid;letter-spacing:.04em;white-space:nowrap}
+.pill.idle,.pill.break,.pill.cancel{color:var(--muted);border-color:var(--line-2)}
+.pill.working,.pill.done{color:var(--ok);border-color:rgba(92,242,166,.4);background:rgba(92,242,166,.07)}
+.pill.moving,.pill.queued{color:var(--net);border-color:rgba(62,224,255,.4);background:rgba(62,224,255,.07)}
+.pill.syncing{color:var(--sync);border-color:rgba(201,168,255,.45)}
+.pill.running,.pill.approval{color:var(--warn);border-color:rgba(255,203,92,.45);background:rgba(255,203,92,.08)}
+.pill.error,.pill.alert{color:var(--crit);border-color:rgba(255,77,106,.6);background:rgba(255,77,106,.12)}
+.board{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:440px;overflow:auto}
+.task-item{--c:var(--net);display:grid;grid-template-columns:4px minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:8px 10px 8px 0;border:1px solid var(--line);border-radius:9px;background:var(--panel-2);cursor:pointer;width:100%;text-align:left}
+.task-item .stripe{grid-row:span 2;align-self:stretch;background:var(--c);border-radius:9px 0 0 9px;box-shadow:0 0 8px var(--c)}
+.task-item .tt{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.task-item .tm{grid-column:2 / 4;font-family:var(--f-mono);font-size:10.5px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap}
+.task-item .tm b{color:var(--c);font-weight:500}
+.empty{color:var(--muted);font-size:12.5px;border:1px dashed var(--line-2);border-radius:10px;padding:16px;text-align:center}
+.drawer{position:absolute;inset:10px 10px 10px auto;width:min(660px,calc(100% - 20px));background:rgba(8,13,22,.97);border:1px solid var(--line-2);border-radius:12px;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.6);z-index:5;min-width:0}
+.d-head{display:flex;align-items:flex-start;gap:10px;padding:14px 14px 10px;border-bottom:1px solid var(--line)}
+.d-head .who{font-family:var(--f-display);font-weight:700;letter-spacing:.08em;font-size:13px}
+.d-head h3{margin:2px 0 0;font-size:15px;font-weight:600;line-height:1.4;overflow-wrap:anywhere}
+.grow{flex:1;min-width:0}
+.d-body{flex:1;overflow:auto;padding:14px;min-height:0}
+.d-foot{border-top:1px solid var(--line);padding:10px 14px 12px;display:flex;flex-direction:column;gap:8px}
+.d-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.turn{margin-bottom:16px}
+.turn .lbl{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;color:var(--muted);margin-bottom:4px;text-transform:uppercase}
+.turn.user .content{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--soft)}
+.md{color:#d3dfee;overflow-wrap:anywhere}
+.md h2,.md h3,.md h4{font-family:var(--f-display);font-weight:600;margin:14px 0 6px;color:var(--fg);font-size:15px}
+.md p{margin:6px 0} .md ul,.md ol{margin:6px 0;padding-left:22px} .md li{margin:2px 0}
+.md code.i{font-family:var(--f-mono);font-size:12px;background:#132033;border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.md strong{color:#fff}
+.md .sub{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.code{border:1px solid var(--line-2);border-radius:9px;margin:10px 0;overflow:hidden;background:#050a12}
+.code .ch{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px 5px 11px;background:#0d1626;border-bottom:1px solid var(--line)}
+.code .fn{font-family:var(--f-mono);font-size:11.5px;color:var(--net)}
+.code pre{margin:0;padding:10px 12px;overflow:auto;max-height:420px;font-family:var(--f-mono);font-size:12px;line-height:1.55;color:#cfe3f5}
+.live{font-family:var(--f-mono);font-size:11px;color:var(--warn);display:flex;align-items:center;gap:8px;margin:4px 0 10px}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--warn);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.25}}
+.modal{position:fixed;inset:0;background:rgba(3,6,10,.8);display:grid;place-items:center;z-index:30;padding:16px}
+.modal .box{width:min(520px,100%);background:var(--panel);border:1px solid var(--line-2);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.modal h2{font-family:var(--f-display);margin:0;font-size:18px;letter-spacing:.04em}
+.modal p{margin:0;color:var(--soft);font-size:13px}
+.modal label{font-size:12px;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#0f1b2c;border:1px solid var(--line-2);padding:8px 14px;border-radius:8px;font-size:13px;z-index:40;max-width:calc(100% - 32px)}
+.tabs{display:flex;gap:4px;margin:-2px 0 10px;border-bottom:1px solid var(--line)}
+.tab{background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:6px 10px;font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.06em;color:var(--muted);cursor:pointer;display:inline-flex;gap:6px;align-items:baseline}
+.tab small{font-family:var(--f-mono);font-size:10.5px;font-weight:400}
+.tab.on{color:var(--fg);border-bottom-color:var(--net)}
+.tab:focus-visible{outline:2px solid var(--net);outline-offset:2px}
+.chat{height:min(420px,52vh);overflow:auto;display:flex;flex-direction:column;gap:10px;padding:2px 2px 10px}
+.msg{max-width:90%;padding:8px 11px;border-radius:12px;font-size:13.5px;overflow-wrap:anywhere;min-width:0}
+.msg.me{align-self:flex-end;background:#11304a;border:1px solid #1d4a6b;border-bottom-right-radius:4px;white-space:pre-wrap}
+.msg.v{align-self:flex-start;background:var(--panel-2);border:1px solid var(--line-2);border-bottom-left-radius:4px}
+.msg.v.report{border-color:rgba(62,224,255,.35)}
+.msg .who{font-family:var(--f-display);font-weight:700;font-size:11px;letter-spacing:.12em;color:var(--net);margin-bottom:3px;display:flex;gap:8px;align-items:baseline}
+.msg .who span{font-family:var(--f-mono);font-weight:400;letter-spacing:0;color:var(--muted)}
+.msg .md p:first-child{margin-top:0} .msg .md p:last-child{margin-bottom:0}
+.msg.typing .md{color:var(--soft)}
+.dots{display:inline-flex;gap:3px;margin-left:4px}.dots i{width:5px;height:5px;border-radius:50%;background:var(--net);animation:pulse 1s infinite}.dots i:nth-child(2){animation-delay:.2s}.dots i:nth-child(3){animation-delay:.4s}
+.tchips{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.tchip{--c:var(--net);display:flex;align-items:center;gap:8px;border:1px solid var(--line-2);border-left:3px solid var(--c);border-radius:7px;padding:5px 8px;background:#0a111c;cursor:pointer;width:100%;text-align:left;font-size:12px;min-width:0}
+.tchip .n{font-family:var(--f-mono);color:var(--muted)} .tchip .a{font-family:var(--f-display);font-weight:700;letter-spacing:.06em;color:var(--c)}
+.tchip .tt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--soft)}
+.chat-input{display:flex;gap:8px;align-items:flex-end}
+.chat-input textarea{min-height:46px;max-height:160px}
+.chat-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
+.chat-empty{color:var(--muted);font-size:12.5px;text-align:center;margin:auto;max-width:300px}
+@media (max-width:1060px){
+  .main{grid-template-columns:1fr}
+  .stage{height:clamp(360px,60vh,600px);min-height:360px}
+  .drawer{position:fixed;inset:auto 0 0 0;width:100%;height:88%;border-radius:14px 14px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
+}
+@media (max-width:480px){.brand h1{font-size:18px}.roster,.mode{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.live i{animation:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2 21 7v10l-9 5-9-5V7z" stroke="#3ee0ff" stroke-width="1.5"/><path d="M12 7 16.5 9.5v5L12 17l-4.5-2.5v-5z" fill="#3ee0ff" fill-opacity=".25" stroke="#3ee0ff" stroke-width="1"/></svg></div>
+      <div><h1>IT AGENT OPS FLOOR</h1><p id="subline">สั่งงานทีม AI Agent ให้ทำงานบนเครื่องคอมฯ ของคุณ</p></div>
+    </div>
+    <div class="meta">
+      <span class="chip" id="workerChip" title="สถานะ worker บนเครื่องคอมฯ"><i class="dot" id="workerDot"></i><span id="workerTxt">กำลังตรวจสอบ…</span></span>
+      <span class="chip"><span>queued</span><b id="stQ">0</b></span>
+      <span class="chip"><span>running</span><b id="stR">0</b></span>
+      <span class="chip"><span>done</span><b id="stD">0</b></span>
+      <button class="btn sm" id="settingsBtn" type="button">ตั้งค่า</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <section class="stage" aria-label="แผนผังออฟฟิศของ agent">
+      <canvas id="cv"></canvas>
+      <div class="corner">FLOOR 3 · NOC + DEV ZONE<br><span id="corner2">—</span></div>
+      <div class="drawer" id="drawer" hidden role="dialog" aria-label="รายละเอียดงาน"></div>
+    </section>
+
+    <aside class="rail">
+      <div class="panel">
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" class="tab on" id="tabBtnVision" data-tab="vision" aria-selected="true" aria-controls="tabVision">💬 VISION <small id="visionEng"></small></button>
+          <button type="button" role="tab" class="tab" id="tabBtnDirect" data-tab="direct" aria-selected="false" aria-controls="tabDirect">สั่งตรงถึง agent <small id="cmdTarget">AUTO</small></button>
+        </div>
+        <div id="tabVision" role="tabpanel" aria-labelledby="tabBtnVision">
+          <div class="chat" id="chatLog" aria-live="polite"><p class="chat-empty">กำลังโหลดบทสนทนา…</p></div>
+          <form id="chatForm" class="chat-input">
+            <label for="chatText" hidden>ข้อความถึง VISION</label>
+            <textarea id="chatText" rows="2" placeholder="คุยหรือสั่งงานกับ VISION เช่น เช็คให้หน่อยว่าเครื่องนี้ disk เหลือเท่าไร แล้วให้ AEGIS ตรวจ Windows Update ด้วย"></textarea>
+            <button class="btn primary" id="chatSend" type="submit">ส่ง</button>
+          </form>
+          <div class="chat-foot"><span class="hint" id="chatHint">Enter ส่ง · Shift+Enter ขึ้นบรรทัดใหม่</span><button type="button" class="btn sm" id="chatNew">เริ่มบทสนทนาใหม่</button></div>
+        </div>
+        <div id="tabDirect" role="tabpanel" aria-labelledby="tabBtnDirect" hidden>
+        <form id="cmdForm">
+          <div class="cmd-row"><label for="agentSel">มอบหมายให้</label><select id="agentSel"></select></div>
+          <div class="cmd-row"><label for="reviewSel">ให้ตรวจทาน</label><select id="reviewSel"></select></div>
+          <div class="mode" role="radiogroup" aria-label="โหมดการทำงาน">
+            <label><input type="radio" name="mode" value="safe" checked><span><b>SAFE</b>อ่าน/เขียนไฟล์ในโฟลเดอร์งาน และค้นเว็บ เริ่มทันที</span></label>
+            <label class="power"><input type="radio" name="mode" value="power"><span><b>POWER</b>รันคำสั่งบนเครื่องได้ ต้องกดอนุมัติก่อนเริ่ม</span></label>
+          </div>
+          <textarea id="cmdText" placeholder="พิมพ์งาน เช่น ตรวจพื้นที่ disk ทุกไดรฟ์บนเครื่องนี้ แล้วสรุปเป็นตาราง"></textarea>
+          <div class="cmd-foot"><span class="hint">Ctrl/⌘ + Enter เพื่อส่ง · งานเก็บเป็น Issue ใน repo ของคุณ</span><button class="btn primary" id="sendBtn" type="submit">สั่งงาน</button></div>
+          <div class="examples" id="examples"></div>
+        </form>
+        </div>
+      </div>
+      <div class="panel"><h2 class="sec-h">Agent roster <small>คลิกเพื่อเลือก</small></h2><div class="roster" id="roster"></div></div>
+      <div class="panel"><h2 class="sec-h">Task board <small id="boardCount">0 งาน</small></h2><ul class="board" id="board"></ul></div>
+    </aside>
+  </div>
+</div>
+
+<div class="modal" id="setup" hidden>
+  <form class="box" id="setupForm">
+    <h2>เชื่อมต่อ GitHub</h2>
+    <p>หน้านี้เก็บงานเป็น Issue ใน repo ส่วนตัวของคุณ ข้อมูลด้านล่างบันทึกไว้เฉพาะในเบราว์เซอร์เครื่องนี้เท่านั้น</p>
+    <label for="sOwner">GitHub username หรือ organization</label><input type="text" id="sOwner" value="MrGalaxy6544" autocomplete="off" required>
+    <label for="sRepo">ชื่อ repo</label><input type="text" id="sRepo" value="agent-office" autocomplete="off" required>
+    <label for="sToken">Fine-grained token (สิทธิ์ Issues: Read and write เฉพาะ repo นี้)</label><input type="password" id="sToken" autocomplete="off" placeholder="github_pat_…" required>
+    <div class="notice" id="setupErr" hidden></div>
+    <div class="d-actions"><button class="btn primary" type="submit">เชื่อมต่อ</button><button class="btn" type="button" id="setupCancel">ยกเลิก</button><span class="grow"></span><button class="btn sm danger" type="button" id="setupForget">ลบข้อมูลจากเครื่องนี้</button></div>
+  </form>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(()=>{
+'use strict';
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const MARK='<!-- agent-office:worker';
+
+// ================= AGENTS =================
+// Built-in layout for the six Claude agents; the worker's agents.json can add more (e.g. ChatGPT).
+const BUILTIN=[
+ {id:'net',name:'NOVA',role:'Network',th:'ดูแลเครือข่าย',color:'#3ee0ff',seat:{x:2.5,y:3.5},desk:[1.4,1.9,3.6,2.8],mon:'back',
+  kw:/network|เครือข่าย|vlan|switch|สวิตช์|wifi|ไวไฟ|unifi|router|dns|dhcp|vpn|subnet|ping|latency|access point/i,ex:'ทดสอบ ping/DNS ไปยัง server หลักทั้งหมด แล้วสรุปผล'},
+ {id:'sec',name:'AEGIS',role:'Security',th:'ความปลอดภัย',color:'#ff4fa3',seat:{x:2.5,y:8.3},desk:[1.4,9.0,3.6,9.9],mon:'front',
+  kw:/security|ความปลอดภัย|firewall|patch|ช่องโหว่|vuln|phishing|mfa|รหัสผ่าน|audit|itgc|active directory|สิทธิ์|malware|defender/i,ex:'ตรวจ Windows Update และ Defender บนเครื่องนี้ แล้วรายงานความเสี่ยง'},
+ {id:'mon',name:'ARGUS',role:'Monitoring',th:'เฝ้าระวังระบบ',color:'#ffd25a',seat:{x:8.5,y:3.5},desk:[7.4,1.9,9.6,2.8],mon:'back',
+  kw:/monitor|มอนิเตอร์|cpu|ram|memory|disk|ดิสก์|uptime|backup|สำรอง|alert|grafana|zabbix|prometheus|metric/i,ex:'ตรวจพื้นที่ disk ทุกไดรฟ์บนเครื่องนี้ แล้วสรุปเป็นตาราง'},
+ {id:'help',name:'ECHO',role:'Helpdesk',th:'ซัพพอร์ตผู้ใช้',color:'#7dff9a',seat:{x:8.5,y:8.3},desk:[7.4,9.0,9.6,9.9],mon:'front',
+  kw:/ticket|ผู้ใช้|printer|ปริ้น|outlook|อีเมลแจ้ง|ประกาศ|คู่มือ|manual|รีเซ็ต|พนักงานใหม่|helpdesk/i,ex:'ทำคู่มือตั้งค่า VPN สำหรับพนักงานใหม่ บันทึกเป็นไฟล์ .md'},
+ {id:'fe',name:'FORGE',role:'Frontend Dev',th:'พัฒนาหน้าเว็บ/UI',color:'#a78bff',seat:{x:4.9,y:11.5},desk:[4.2,12.2,5.6,13.0],mon:'front',dev:true,
+  kw:/หน้าเว็บ|เว็บไซต์|website|frontend|ui\b|react|html|css|tailwind|landing|ฟอร์ม|หน้าจอ/i,ex:'สร้างหน้า dashboard สถานะ server ด้วย HTML + Tailwind'},
+ {id:'be',name:'CIPHER',role:'Backend Dev',th:'พัฒนา API/ระบบ',color:'#ff8f5a',seat:{x:7.1,y:11.5},desk:[6.4,12.2,7.8,13.0],mon:'front',dev:true,
+  kw:/api|backend|database|ฐานข้อมูล|sql|node|python|express|fastapi|บอท|bot|line|webhook|script|สคริปต์/i,ex:'เขียน Node.js bot ส่งสรุปสถานะ server เข้า LINE OA'},
+];
+let AGENTS=[],byId={};
+
+// ================= GITHUB =================
+let conf=null; try{conf=JSON.parse(localStorage.getItem('ao.conf')||'null');}catch(_){}
+const etags=new Map();
+async function gh(path,opt={}){
+  const url=path.startsWith('http')?path:`https://api.github.com/repos/${conf.owner}/${conf.repo}${path}`;
+  const method=opt.method||'GET';
+  const headers={Authorization:`Bearer ${conf.token}`,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+  const cached=method==='GET'?etags.get(url):null;
+  if(cached)headers['If-None-Match']=cached.etag;
+  if(opt.body)headers['Content-Type']='application/json';
+  const res=await fetch(url,{method,headers,body:opt.body?JSON.stringify(opt.body):undefined,cache:'no-store'});
+  if(res.status===304&&cached)return cached.data;
+  if(res.status===204)return null;
+  const data=await res.json().catch(()=>null);
+  if(!res.ok){const e=new Error((data&&data.message)||('HTTP '+res.status));e.status=res.status;throw e;}
+  if(method==='GET'){const et=res.headers.get('ETag');if(et)etags.set(url,{etag:et,data});}
+  return data;
+}
+const lbls=i=>(i.labels||[]).map(l=>typeof l==='string'?l:l.name);
+function toTask(i){
+  const L=lbls(i);const st=(L.find(l=>l.startsWith('status:'))||'status:queued').slice(7);
+  return {num:i.number,title:i.title,agent:(L.find(l=>l.startsWith('agent:'))||'agent:help').slice(6),mode:L.includes('mode:power')?'power':'safe',reviewer:(L.find(l=>l.startsWith('review:'))||'').slice(7)||null,reviewing:L.includes('reviewer-active'),
+    status:st==='needs-approval'?'approval':st,labels:L,body:i.body||'',url:i.html_url,createdAt:Date.parse(i.created_at),updatedAt:Date.parse(i.updated_at),comments:i.comments};
+}
+async function setStatus(t,status){
+  const keep=t.labels.filter(l=>!l.startsWith('status:'));
+  await gh(`/issues/${t.num}/labels`,{method:'PUT',body:{labels:[...keep,'status:'+status]}});
+}
+
+// ================= GEOMETRY & SIM =================
+const cv=$('cv'),ctx=cv.getContext('2d');
+let FW=12;const FD=13.6,LANE=5.9;
+const RACK={x0:10.4,y0:0.5,x1:11.6,y1:3.6,h:120,stand:{x:10.1,y:4.4}};
+const COFFEE={x0:0.3,y0:10.4,x1:1.3,y1:11.4,h:34,stand:{x:0.9,y:9.9}};
+const CORE={x:6,y:6};
+const coreStand=id=>{const n=AGENTS.length,i=AGENTS.findIndex(a=>a.id===id),sp=Math.min(0.55,6/Math.max(n,1));return {x:6-sp*(n-1)/2+i*sp,y:6.9};};
+let W=0,H=0,s=1,cx=0,top=0,dpr=1;
+function resize(){const r=cv.getBoundingClientRect();dpr=Math.min(window.devicePixelRatio||1,2);W=r.width;H=r.height;cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
+  s=Math.min(W/((FW+FD)*32+60),H/((FW+FD)*16+190));cx=W/2-(FW-FD)*16*s;top=H/2-((FW+FD)/2)*16*s+44*s;}
+const P=(x,y,z=0)=>[cx+(x-y)*32*s,top+(x+y)*16*s-z*s];
+let t=0,selected=null;const packets=[],timers=[];
+const later=(dt,fn)=>timers.push({at:t+dt,fn});
+const say=(a,text,dur=3)=>{a.bubble={text,until:t+dur};};
+function route(a,to){const pts=[];if(Math.abs(a.y-LANE)>.05)pts.push({x:a.x,y:LANE});if(Math.abs(to.x-a.x)>.05)pts.push({x:to.x,y:LANE});pts.push(to);return pts.map(p=>({type:'go',...p}));}
+const standAt=o=>({x:o.seat.x+0.95,y:o.seat.y+(o.seat.y<5?0.55:-0.55)});
+function trip(a,dest,stay,onStart,state='syncing'){a.steps=[...route(a,dest),{type:'stay',t:stay,state,onStart},{type:'home'}];}
+function link(a,o,dur){a.linkTo=o.id;o.linkTo=a.id;o.holdUntil=Math.max(o.holdUntil,t+dur);later(dur,()=>{if(a.linkTo===o.id)a.linkTo=null;if(o.linkTo===a.id)o.linkTo=null;});}
+const short=(x,n)=>x.length>n?x.slice(0,n-1)+'…':x;
+function onTaskStarted(a,task){a.steps=[];trip(a,coreStand(a.id),1.6,()=>say(a,'รับงาน: '+short(task.title,26),2.6));}
+function onTaskFinished(a,task,ok){
+  say(a,ok?'เสร็จแล้ว ✔ '+short(task.title,22):'ติดปัญหา ✖',3.2);
+  if(ok){for(let i=0;i<5;i++)later(i*0.18,()=>packets.push({fx:a.x,fy:a.y,tx:CORE.x,ty:CORE.y,p:0,c:a.color}));
+    if(a.dev){const o=byId[a.id==='fe'?'be':'fe'];if(!o.busy&&!o.steps.length)later(1.2,()=>{link(a,o,3);say(o,'รับไปรีวิวต่อ 👍',2.4);});}}
+}
+function wander(a){const r=Math.random();
+  if(r<.35)trip(a,COFFEE.stand,3.5,()=>say(a,'เติมกาแฟ ☕',2.2),'break');
+  else if(r<.6)trip(a,RACK.stand,3,()=>say(a,'ตรวจ rack',2));
+  else{const o=AGENTS.filter(x=>x!==a&&!x.busy&&!x.steps.length)[Math.floor(Math.random()*4)];if(o)trip(a,standAt(o),3.5,()=>{link(a,o,3.5);say(a,'อัปเดตงานกับ '+o.name,2.2);});}}
+function update(dt){
+  t+=dt;for(let i=timers.length-1;i>=0;i--)if(t>=timers[i].at){const f=timers[i].fn;timers.splice(i,1);f();}
+  for(const a of AGENTS){
+    if(a.steps.length){const st=a.steps[0];
+      if(st.type==='home'){a.steps.shift();a.steps.unshift(...route(a,a.seat));continue;}
+      if(st.type==='go'){a.state='moving';const dx=st.x-a.x,dy=st.y-a.y,d=Math.hypot(dx,dy),v=2.6*dt;if(d<=v){a.x=st.x;a.y=st.y;a.steps.shift();}else{a.x+=dx/d*v;a.y+=dy/d*v;}}
+      else{if(!st.started){st.started=true;st.end=t+st.t;st.onStart&&st.onStart();}a.state=st.state;if(t>=st.end)a.steps.shift();}
+      continue;}
+    if(a.busy)a.state='working';
+    else if(t<a.holdUntil)a.state='syncing';
+    else{a.state='idle';if(t>a.nextWander){a.nextWander=t+18+Math.random()*30;wander(a);}}
+  }
+  for(let i=packets.length-1;i>=0;i--){packets[i].p+=dt*0.6;if(packets[i].p>=1)packets.splice(i,1);}
+  if(Math.random()<dt*0.6){const b=AGENTS.filter(a=>a.busy&&!a.steps.length);const a=b[Math.floor(Math.random()*b.length)];if(a)packets.push({fx:a.seat.x,fy:a.seat.y,tx:CORE.x,ty:CORE.y,p:0,c:a.color});}
+}
+
+// ================= DRAW =================
+function poly(pts,fill,stroke,lw=1){ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lw;ctx.stroke();}}
+function hexA(h,a){const n=parseInt(h.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;}
+function box(x0,y0,x1,y1,h,{top='#16243a',left='#0d1626',right='#0a111d',edge='rgba(80,140,200,.35)'}={}){
+  const a=P(x0,y0,h),b=P(x1,y0,h),c=P(x1,y1,h),d=P(x0,y1,h),b0=P(x1,y0),c0=P(x1,y1),d0=P(x0,y1);
+  poly([b0,c0,c,b],right,edge);poly([d0,c0,c,d],left,edge);poly([a,b,c,d],top,edge);}
+function drawFloor(){
+  const c=[P(0,0),P(FW,0),P(FW,FD),P(0,FD)];const g=ctx.createLinearGradient(0,c[0][1],0,c[2][1]);g.addColorStop(0,'#0b1626');g.addColorStop(1,'#08101c');
+  poly(c,g,'rgba(62,224,255,.35)',1.4);
+  poly([P(3.8,10.9),P(8.2,10.9),P(8.2,13.4),P(3.8,13.4)],'rgba(167,139,255,.05)','rgba(167,139,255,.25)');
+  const dl=P(6,13.45);ctx.font=`700 ${Math.max(8,10*s)}px "Chakra Petch",sans-serif`;ctx.fillStyle='rgba(167,139,255,.6)';ctx.textAlign='center';ctx.fillText('DEV ZONE',dl[0],dl[1]+12*s);
+  if(FW>12){poly([P(12.15,0.4),P(FW-0.15,0.4),P(FW-0.15,FD-0.3),P(12.15,FD-0.3)],'rgba(25,195,125,.045)','rgba(25,195,125,.3)');const pl=P((12.15+FW)/2,LANE+1.3);ctx.fillStyle='rgba(25,195,125,.75)';ctx.fillText('PARTNER AI ZONE',pl[0],pl[1]);}
+  ctx.lineWidth=1;
+  for(let i=1;i<FW;i++){ctx.strokeStyle=i%3===0?'rgba(62,224,255,.13)':'rgba(62,224,255,.055)';const p=P(i,0),q=P(i,FD);ctx.beginPath();ctx.moveTo(...p);ctx.lineTo(...q);ctx.stroke();}
+  for(let i=1;i<FD;i++){ctx.strokeStyle=i%3===0?'rgba(62,224,255,.13)':'rgba(62,224,255,.055)';const p=P(0,i),q=P(FW,i);ctx.beginPath();ctx.moveTo(...p);ctx.lineTo(...q);ctx.stroke();}
+  const e=10*s;poly([c[1],c[2],[c[2][0],c[2][1]+e],[c[1][0],c[1][1]+e]],'#060c16','rgba(62,224,255,.2)');poly([c[3],c[2],[c[2][0],c[2][1]+e],[c[3][0],c[3][1]+e]],'#050a12','rgba(62,224,255,.2)');
+  poly([P(0.4,LANE-.35),P(FW-.4,LANE-.35),P(FW-.4,LANE+.35),P(0.4,LANE+.35)],'rgba(62,224,255,.035)');
+  for(const a of AGENTS){const [x,y]=P(a.seat.x,(a.desk[1]+a.desk[3])/4+a.seat.y/2);const r=(a.dev?80:110)*s;const gg=ctx.createRadialGradient(x,y,0,x,y,r);
+    const k=(selected&&selected!==a.id)?0.05:(a.busy?0.2:0.12);gg.addColorStop(0,hexA(a.color,k));gg.addColorStop(1,hexA(a.color,0));ctx.fillStyle=gg;ctx.beginPath();ctx.ellipse(x,y,r,r/2,0,0,Math.PI*2);ctx.fill();}
+}
+function drawCore(){
+  const [x,y]=P(CORE.x,CORE.y),rx=70*s,ry=35*s,any=AGENTS.some(a=>a.busy),col=workerOnline===false?'255,77,106':'62,224,255';
+  for(let i=0;i<3;i++){ctx.strokeStyle=`rgba(${col},${0.25-i*0.07})`;ctx.lineWidth=1.2;ctx.beginPath();ctx.ellipse(x,y,rx*(1-i*.25),ry*(1-i*.25),0,0,Math.PI*2);ctx.stroke();}
+  const rot=reduce?0:t*(any?1.8:0.7);ctx.strokeStyle=`rgba(${col},.85)`;ctx.lineWidth=2.4*s;
+  ctx.beginPath();ctx.ellipse(x,y,rx*.75,ry*.75,0,rot,rot+1.3);ctx.stroke();ctx.beginPath();ctx.ellipse(x,y,rx*.75,ry*.75,0,rot+Math.PI,rot+Math.PI+1.3);ctx.stroke();
+  const hgt=70*s,g=ctx.createLinearGradient(0,y-hgt,0,y);g.addColorStop(0,`rgba(${col},0)`);g.addColorStop(1,`rgba(${col},${any?.3:.18})`);
+  ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(x-rx*.45,y);ctx.lineTo(x-rx*.2,y-hgt);ctx.lineTo(x+rx*.2,y-hgt);ctx.lineTo(x+rx*.45,y);ctx.closePath();ctx.fill();
+  drawVision(x,y,col);
+  ctx.font=`600 ${Math.max(9,10*s)}px "JetBrains Mono",monospace`;ctx.fillStyle=`rgba(${col},.8)`;ctx.textAlign='center';
+  ctx.fillText(workerOnline===false?'VISION · PC OFFLINE':V.typing?'VISION · THINKING':any?'VISION · COORDINATING':'VISION · READY',x,y+ry+14*s);
+}
+function drawDesk(a){
+  const [x0,y0,x1,y1]=a.desk,dh=22,dim=selected&&selected!==a.id;
+  box(x0,y0,x1,y1,dh,{top:'#142238',left:'#0c1525',right:'#09111c',edge:hexA(a.color,dim?.15:.45)});
+  const my=a.mon==='back'?y0+0.18:y1-0.18,m=a.dev?0.15:0.35;
+  const lum=a.busy?(0.32+0.1*Math.sin(t*5)):0.16;
+  poly([P(x0+m,my,dh+2),P(x1-m,my,dh+2),P(x1-m,my,dh+26),P(x0+m,my,dh+26)],hexA(a.color,dim?0.08:lum),hexA(a.color,dim?.3:.9),1.2);
+  if(!dim){ctx.strokeStyle=hexA(a.color,a.busy?.85:.4);ctx.lineWidth=1;
+    for(let i=0;i<4;i++){const f=((i/4)+(reduce||!a.busy?0:t*0.4))%1,len=0.3+((i*37)%5)/8,z=dh+5+f*18,xa=x0+m+0.15,xb=Math.min(x1-m-0.1,xa+len*(x1-x0-2*m-0.2));
+      const q1=P(xa,my,z),q2=P(xb,my,z);ctx.beginPath();ctx.moveTo(...q1);ctx.lineTo(...q2);ctx.stroke();}}
+  const np=P((x0+x1)/2,y1,6);ctx.font=`700 ${Math.max(8,9*s)}px "Chakra Petch",sans-serif`;ctx.fillStyle=hexA(a.color,dim?.3:.85);ctx.textAlign='center';ctx.fillText(a.role.toUpperCase(),np[0]-12*s,np[1]+4*s);
+}
+function drawRack(){const {x0,y0,x1,y1,h}=RACK;box(x0,y0,x1,y1,h,{top:'#17263c',left:'#0b1422',right:'#0c1626',edge:'rgba(62,224,255,.45)'});
+  for(let u=0;u<10;u++){const z=10+u*11;for(let k=0;k<5;k++){const y=y0+0.35+k*0.55,on=reduce?((u+k)%3!==0):Math.sin(t*(3+((u*7+k*3)%5))+u*k)>-.2;const p=P(x1,y,z);ctx.fillStyle=on?(k%3===0?'#ffd25a':'#5cf2a6'):'#1a2b40';ctx.fillRect(p[0]-1.4*s,p[1]-1*s,2.8*s,2*s);}}
+  const lp=P((x0+x1)/2,y0,h+14);ctx.font=`600 ${Math.max(8,9*s)}px "JetBrains Mono",monospace`;ctx.fillStyle='rgba(62,224,255,.75)';ctx.textAlign='center';ctx.fillText(workerHost?short(workerHost,18):'RACK-A',lp[0],lp[1]);}
+function drawCoffee(){const {x0,y0,x1,y1,h}=COFFEE;box(x0,y0,x1,y1,h,{top:'#1b2a40',left:'#0e1828',right:'#0b1320',edge:'rgba(125,255,154,.35)'});const p=P((x0+x1)/2,(y0+y1)/2,h+10);ctx.font=`${Math.max(10,13*s)}px system-ui`;ctx.textAlign='center';ctx.fillText('☕',p[0],p[1]);}
+function drawAgent(a){
+  const [px,py]=P(a.x,a.y),dim=selected&&selected!==a.id,bob=reduce?0:Math.sin(t*3+a.phase)*2.2*s*(a.state==='moving'?1.6:1),col=a.state==='alert'?'#ff4d6a':a.color;
+  ctx.globalAlpha=dim?0.45:1;
+  if(selected===a.id){ctx.strokeStyle=hexA(a.color,.9);ctx.lineWidth=1.6;ctx.beginPath();ctx.ellipse(px,py,18*s,9*s,0,0,Math.PI*2);ctx.stroke();}
+  if(a.busy&&!a.steps.length){const k=(t*0.8)%1;ctx.strokeStyle=hexA(col,(1-k)*.7);ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(px,py,(10+k*20)*s,(5+k*10)*s,0,0,Math.PI*2);ctx.stroke();}
+  if(a.waiting&&!a.busy){ctx.strokeStyle=`rgba(255,203,92,${0.5+0.4*Math.sin(t*4)})`;ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(px,py,16*s,8*s,0,0,Math.PI*2);ctx.stroke();}
+  ctx.fillStyle='rgba(0,0,0,.55)';ctx.beginPath();ctx.ellipse(px,py,9*s,4.5*s,0,0,Math.PI*2);ctx.fill();
+  const bw=15*s,bh=19*s,bx=px-bw/2,by=py-26*s+bob;
+  const tg=ctx.createRadialGradient(px,by+bh,0,px,by+bh,10*s);tg.addColorStop(0,hexA(col,.7));tg.addColorStop(1,hexA(col,0));ctx.fillStyle=tg;ctx.beginPath();ctx.ellipse(px,by+bh+2*s,8*s,5*s,0,0,Math.PI*2);ctx.fill();
+  ctx.shadowColor=col;ctx.shadowBlur=dim?0:14*s;const g=ctx.createLinearGradient(0,by,0,by+bh);g.addColorStop(0,'#22334d');g.addColorStop(1,'#0e1726');
+  ctx.fillStyle=g;ctx.strokeStyle=col;ctx.lineWidth=1.4;ctx.beginPath();ctx.roundRect(bx,by,bw,bh,5*s);ctx.fill();ctx.stroke();ctx.shadowBlur=0;
+  ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=dim?0:10*s;const blink=(!reduce&&(t+a.phase)%4<0.12)?0.6:4.2;ctx.beginPath();ctx.roundRect(bx+2.5*s,by+4.5*s,bw-5*s,blink*s,2*s);ctx.fill();ctx.shadowBlur=0;
+  if(a.dev){ctx.strokeStyle=hexA(col,.8);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(px-3*s,by+12*s);ctx.lineTo(px-5*s,by+14*s);ctx.lineTo(px-3*s,by+16*s);ctx.moveTo(px+3*s,by+12*s);ctx.lineTo(px+5*s,by+14*s);ctx.lineTo(px+3*s,by+16*s);ctx.stroke();}
+  else{ctx.fillStyle=hexA(col,.6);ctx.fillRect(px-1.5*s,by+12*s,3*s,3*s);}
+  ctx.strokeStyle=hexA(col,.8);ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(px,by);ctx.lineTo(px,by-6*s);ctx.stroke();ctx.fillStyle=col;ctx.beginPath();ctx.arc(px,by-7*s,2*s,0,Math.PI*2);ctx.fill();
+  if(a.state==='working'&&!reduce&&!dim){for(let i=0;i<3;i++){const f=(t*1.4+i/3)%1;ctx.fillStyle=hexA(a.color,1-f);ctx.fillRect(px+(i-1)*5*s,by-10*s-f*14*s,1.6*s,1.6*s);}}
+  ctx.font=`700 ${Math.max(9,10*s)}px "Chakra Petch",sans-serif`;ctx.textAlign='center';ctx.fillStyle=hexA(a.color,.95);ctx.fillText(a.name,px,py+15*s);
+  if(a.engineShort){ctx.font=`600 ${Math.max(8,8.5*s)}px "JetBrains Mono",monospace`;ctx.fillStyle=hexA(a.color,.7);ctx.fillText(a.engineShort,px,py+26*s);}
+  ctx.globalAlpha=1;a._sx=px;a._sy=by;
+}
+// VISION: a hologram secretary standing on the core.
+const V={typing:false,bubble:null,name:'VISION',_sx:0,_sy:0};
+function drawVision(x,y,col){
+  const fy=y-40*s+(reduce?0:Math.sin(t*1.6)*3*s),a=V.typing?(0.75+0.25*Math.sin(t*6)):0.85;
+  ctx.save();ctx.globalAlpha=a;
+  const g=ctx.createLinearGradient(0,fy-34*s,0,fy+16*s);g.addColorStop(0,`rgba(${col},.55)`);g.addColorStop(1,`rgba(${col},.08)`);
+  ctx.fillStyle=g;ctx.strokeStyle=`rgba(${col},.95)`;ctx.lineWidth=1.3;ctx.shadowColor=`rgb(${col})`;ctx.shadowBlur=14*s;
+  ctx.beginPath();ctx.moveTo(x-15*s,fy+16*s);ctx.quadraticCurveTo(x-15*s,fy-6*s,x-6*s,fy-9*s);ctx.lineTo(x+6*s,fy-9*s);ctx.quadraticCurveTo(x+15*s,fy-6*s,x+15*s,fy+16*s);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.beginPath();ctx.arc(x,fy-19*s,8.5*s,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.shadowBlur=0;
+  ctx.fillStyle=`rgb(${col})`;ctx.fillRect(x-5.5*s,fy-20.5*s,11*s,2.6*s);
+  ctx.strokeStyle=`rgba(${col},.25)`;ctx.lineWidth=1;for(let k=0;k<7;k++){const yy=fy-26*s+k*6*s+(reduce?0:(t*12)%6)*s;ctx.beginPath();ctx.moveTo(x-15*s,yy);ctx.lineTo(x+15*s,yy);ctx.stroke();}
+  if(V.typing){for(let k=0;k<3;k++){const f=(t*0.9+k/3)%1;ctx.strokeStyle=`rgba(${col},${(1-f)*.6})`;ctx.beginPath();ctx.ellipse(x,y,(20+f*60)*s,(10+f*30)*s,0,0,Math.PI*2);ctx.stroke();}}
+  ctx.restore();V._sx=x;V._sy=fy-30*s;
+}
+function drawBubble(a){if(!a.bubble||t>a.bubble.until)return;const fs=Math.max(11,12*s);ctx.font=`500 ${fs}px "IBM Plex Sans Thai",sans-serif`;
+  const w=ctx.measureText(a.bubble.text).width+16,h=fs+12;let x=a._sx-w/2,y=a._sy-26*s-h;x=Math.max(6,Math.min(W-w-6,x));y=Math.max(6,y);
+  ctx.globalAlpha=Math.min(1,(a.bubble.until-t)*3);ctx.fillStyle='rgba(8,14,24,.94)';ctx.strokeStyle=hexA(a.color,.85);ctx.lineWidth=1.2;ctx.beginPath();ctx.roundRect(x,y,w,h,6);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#e8f1fb';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(a.bubble.text,x+8,y+h/2+1);ctx.textBaseline='alphabetic';ctx.globalAlpha=1;}
+function drawLinks(){const seen=new Set();for(const a of AGENTS){if(!a.linkTo)continue;const o=byId[a.linkTo],key=[a.id,o.id].sort().join();if(seen.has(key))continue;seen.add(key);
+  const p=P(a.x,a.y,22),q=P(o.x,o.y,22),mid=[(p[0]+q[0])/2,(p[1]+q[1])/2-26*s];ctx.setLineDash([5*s,5*s]);ctx.lineDashOffset=reduce?0:-t*30;ctx.strokeStyle='rgba(201,168,255,.85)';ctx.lineWidth=1.6;
+  ctx.beginPath();ctx.moveTo(...p);ctx.quadraticCurveTo(mid[0],mid[1],q[0],q[1]);ctx.stroke();ctx.setLineDash([]);}}
+function drawPackets(){for(const k of packets){const x=k.fx+(k.tx-k.fx)*k.p,y=k.fy+(k.ty-k.fy)*k.p,z=4+Math.sin(k.p*Math.PI)*30,[px,py]=P(x,y,z);
+  ctx.fillStyle=k.c;ctx.shadowColor=k.c;ctx.shadowBlur=10;ctx.globalAlpha=1-k.p*.6;ctx.beginPath();ctx.arc(px,py,2.2*s,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.globalAlpha=1;}}
+function render(){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);drawFloor();drawCore();
+  const items=[];for(const a of AGENTS)items.push({d:(a.desk[0]+a.desk[2])/2+(a.desk[1]+a.desk[3])/2,f:()=>drawDesk(a)});
+  items.push({d:(RACK.x0+RACK.x1)/2+(RACK.y0+RACK.y1)/2,f:drawRack});items.push({d:(COFFEE.x0+COFFEE.x1)/2+(COFFEE.y0+COFFEE.y1)/2,f:drawCoffee});
+  for(const a of AGENTS)items.push({d:a.x+a.y+0.01,f:()=>drawAgent(a)});items.sort((a,b)=>a.d-b.d).forEach(i=>i.f());drawPackets();drawLinks();AGENTS.forEach(drawBubble);if(V.bubble)drawBubble({...V,color:'#3ee0ff',state:''});}
+
+// ================= TASKS =================
+let tasks=[],workerOnline=null,workerHost='',workerSeen=0;
+function onTasks(list){
+  const prev=Object.fromEntries(tasks.map(x=>[x.num,x.status]));
+  tasks=list;
+  for(const a of AGENTS){
+    const run=tasks.find(x=>x.status==='running'&&(x.reviewing&&x.reviewer?x.reviewer:x.agent)===a.id);const was=a.busy;a.busy=run||null;
+    a.waiting=tasks.find(x=>x.agent===a.id&&x.status==='approval')||null;
+    if(run&&(!was||was.num!==run.num))onTaskStarted(a,run);
+  }
+  for(const x of tasks){const p=prev[x.num];if(p==='running'&&(x.status==='done'||x.status==='error'||x.status==='cancel'))onTaskFinished(byId[x.agent]||AGENTS[0],x,x.status==='done');}
+  renderBoard();renderRoster();if(openNum)loadDetail();if(chatLoaded)renderChat();
+}
+async function refresh(){
+  if(!conf)return;
+  try{
+    const issues=await gh('/issues?labels=agent-task&state=open&per_page=50&sort=created&direction=desc');
+    onTasks(issues.filter(i=>!i.pull_request).map(toTask));
+  }catch(e){if(e.status===401||e.status===404){openSetup('เชื่อมต่อไม่ได้: '+e.message+' — ตรวจ token, owner และชื่อ repo');}else toast('โหลดงานไม่สำเร็จ: '+e.message);}
+}
+async function refreshWorker(){
+  if(!conf)return;
+  try{
+    const hb=await gh('/issues?labels=worker-heartbeat&state=all&per_page=1');
+    if(!hb.length){workerOnline=false;workerHost='';}
+    else{const m=(hb[0].body||'').match(/```json\n([\s\S]*?)```/);const info=m?JSON.parse(m[1]):{};
+      workerSeen=Date.parse(info.lastSeen||0);workerHost=info.host||'';workerOnline=Date.now()-workerSeen<3*60*1000;
+      if(info.vision){V.name=info.vision.name||'VISION';$('visionEng').textContent=info.vision.engineLabel||'';}
+      if(Array.isArray(info.agents)&&info.agents.length){const before=rosterKey;setRoster(info.agents);if(before!==rosterKey)onTasks(tasks);}}
+  }catch(_){workerOnline=null;}
+  const dot=$('workerDot'),txt=$('workerTxt');
+  dot.className='dot'+(workerOnline?' on':workerOnline===false?' off':'');
+  txt.textContent=workerOnline?`PC online · ${workerHost}`:workerOnline===false?(workerSeen?`PC offline · เห็นล่าสุด ${ago(workerSeen)}`:'ยังไม่พบ worker'):'ตรวจสอบไม่ได้';
+  $('corner2').textContent=workerOnline?`${AGENTS.length} agents · ${workerHost}`:'worker offline · งานจะรอในคิว';
+}
+
+// ================= UI =================
+const sel=$('agentSel'),revSel=$('reviewSel');
+sel.addEventListener('change',()=>{selected=sel.value==='auto'?null:sel.value;syncSelect();});
+function syncSelect(){$('cmdTarget').textContent=selected&&byId[selected]?byId[selected].name:'AUTO';for(const a of AGENTS)cards[a.id]&&cards[a.id].el.classList.toggle('sel',a.id===selected);}
+function select(id){selected=selected===id?null:id;sel.value=selected||'auto';syncSelect();}
+$('examples').addEventListener('click',e=>{const b=e.target.closest('.ex');if(!b)return;$('cmdText').value=b.textContent;selected=b.dataset.a;sel.value=selected;syncSelect();$('cmdText').focus();});
+const roster=$('roster');let cards={},rosterKey='';
+const ENGINE_SHORT={'codex':'GPT','openai-api':'API','command':'CLI'};
+// Partner desks for agents beyond the built-in six: a new 3-desk column per three agents.
+const SLOT_ROWS=[{y0:1.9,y1:2.8,sy:3.5,mon:'back'},{y0:9.0,y1:9.9,sy:8.3,mon:'front'},{y0:12.2,y1:13.0,sy:11.5,mon:'front'}];
+function setRoster(list){
+  const key=JSON.stringify(list);if(key===rosterKey)return;rosterKey=key;
+  const old=byId;let k=0;
+  AGENTS=list.map((r,i)=>{
+    const b=BUILTIN.find(x=>x.id===r.id);let lay;
+    if(b)lay={seat:b.seat,desk:b.desk,mon:b.mon,kw:b.kw,ex:b.ex};
+    else{const col=Math.floor(k/3),row=SLOT_ROWS[k%3],x0=12.4+col*3;k++;lay={seat:{x:x0+1.1,y:row.sy},desk:[x0,row.y0,x0+2.2,row.y1],mon:row.mon,kw:null,ex:''};}
+    let kw=lay.kw;if(r.keywords){try{kw=new RegExp(r.keywords,'i');}catch(_){}}
+    const prev=old[r.id];
+    return Object.assign({id:r.id,name:r.name,role:r.role,th:r.th||'',color:r.color||'#8fb3d9',dev:!!r.dev,engine:r.engine||'claude-code',engineLabel:r.engineLabel||'Claude',engineShort:ENGINE_SHORT[r.engine]||''},lay,{kw},
+      prev&&prev.seat.x===lay.seat.x&&prev.seat.y===lay.seat.y?{x:prev.x,y:prev.y,steps:prev.steps,state:prev.state,bubble:prev.bubble}:{x:lay.seat.x,y:lay.seat.y,steps:[],state:'idle',bubble:null},
+      {phase:i*1.7,linkTo:null,holdUntil:0,nextWander:t+8+Math.random()*20,busy:null,waiting:null});
+  });
+  byId=Object.fromEntries(AGENTS.map(a=>[a.id,a]));
+  FW=12+3*Math.ceil(k/3);resize();
+  if(selected&&!byId[selected])selected=null;
+  sel.innerHTML=`<option value="auto">AUTO · เลือก agent ให้ตามเนื้องาน</option>`+AGENTS.map(a=>`<option value="${a.id}">${esc(a.name)} · ${esc(a.role)} · ${esc(a.engineLabel)}</option>`).join('');
+  sel.value=selected||'auto';
+  const rv=revSel.value;revSel.innerHTML=`<option value="">ไม่ต้องตรวจทาน</option>`+AGENTS.map(a=>`<option value="${a.id}">${esc(a.name)} · ${esc(a.engineLabel)}</option>`).join('');if(byId[rv])revSel.value=rv;
+  $('examples').innerHTML=AGENTS.filter(a=>a.ex).map(a=>`<button type="button" class="ex" data-a="${a.id}" style="border-color:${hexA(a.color,.35)}">${esc(a.ex)}</button>`).join('');
+  roster.innerHTML='';cards={};
+  for(const a of AGENTS){const b=document.createElement('button');b.type='button';b.className='card';b.style.setProperty('--c',a.color);
+    b.innerHTML=`<span class="r1"><span class="nm">${esc(a.name)}</span><span class="pill idle">IDLE</span></span><span class="role">${esc(a.role)} · ${esc(a.engineLabel)}</span><span class="task">พร้อมรับงาน</span>`;
+    b.addEventListener('click',()=>select(a.id));roster.appendChild(b);cards[a.id]={el:b,pill:b.querySelector('.pill'),task:b.querySelector('.task')};}
+  syncSelect();
+  $('corner2').textContent=`${AGENTS.length} agents`+(workerHost?` · ${workerHost}`:'');
+}
+setRoster(BUILTIN.map(b=>({id:b.id,name:b.name,role:b.role,th:b.th,color:b.color,dev:b.dev,engine:'claude-code',engineLabel:'Claude'})));
+const LABEL={working:'WORKING',moving:'MOVING',syncing:'SYNCING',alert:'ERROR',break:'BREAK',idle:'IDLE'};
+function renderRoster(){for(const a of AGENTS){const c=cards[a.id],st=a.state;if(c.pill.dataset.s!==st){c.pill.dataset.s=st;c.pill.className='pill '+st;c.pill.textContent=LABEL[st]||st;}
+  const q=tasks.filter(x=>x.agent===a.id&&x.status==='queued').length;
+  const txt=a.busy?'⚙ '+a.busy.title:a.waiting?'⏸ รออนุมัติ: '+a.waiting.title:q?`รอคิว ${q} งาน`:'พร้อมรับงาน';if(c.task.textContent!==txt)c.task.textContent=txt;}}
+const ago=ms=>{const d=(Date.now()-ms)/1000;if(d<60)return 'เมื่อสักครู่';if(d<3600)return Math.floor(d/60)+' นาทีที่แล้ว';if(d<86400)return Math.floor(d/3600)+' ชม.ที่แล้ว';return new Date(ms).toLocaleDateString('th-TH',{day:'numeric',month:'short'});};
+const STXT={queued:'QUEUED',approval:'APPROVE?',running:'RUNNING',done:'DONE',error:'ERROR',cancel:'CANCELLED'};
+function renderBoard(){
+  const ul=$('board');$('boardCount').textContent=tasks.length+' งาน';
+  $('stQ').textContent=tasks.filter(x=>x.status==='queued'||x.status==='approval').length;$('stR').textContent=tasks.filter(x=>x.status==='running').length;$('stD').textContent=tasks.filter(x=>x.status==='done').length;
+  if(!conf){ul.innerHTML='<li class="empty">ยังไม่ได้เชื่อมต่อ GitHub · กดปุ่ม "ตั้งค่า" ด้านบน</li>';return;}
+  if(!tasks.length){ul.innerHTML='<li class="empty">ยังไม่มีงาน · พิมพ์คำสั่งด้านบน หรือกดตัวอย่างงานเพื่อเริ่ม</li>';return;}
+  ul.innerHTML=tasks.map(x=>{const a=byId[x.agent]||AGENTS[0];
+    return `<li><button type="button" class="task-item" data-n="${x.num}" style="--c:${a.color}"><span class="stripe"></span><span class="tt">#${x.num} ${esc(x.title)}</span><span class="pill ${x.status}">${STXT[x.status]||x.status}</span><span class="tm"><b>${a.name}</b><span>${x.mode.toUpperCase()}</span><span>${ago(x.createdAt)}</span></span></button></li>`;}).join('');
+}
+$('board').addEventListener('click',e=>{const b=e.target.closest('.task-item');if(b)openTask(+b.dataset.n);});
+
+$('cmdForm').addEventListener('submit',async e=>{
+  e.preventDefault();if(!conf){openSetup();return;}
+  const text=$('cmdText').value.trim();if(!text)return;
+  const mode=document.querySelector('input[name=mode]:checked').value;
+  let agent=selected;if(!agent){let best=byId.help?'help':AGENTS[0].id,sc=0;for(const a of AGENTS){if(!a.kw)continue;const m=text.match(new RegExp(a.kw.source,'gi'));if(m&&m.length>sc){sc=m.length;best=a.id;}}agent=best;}
+  const btn=$('sendBtn');btn.disabled=true;btn.textContent='กำลังส่ง…';
+  try{
+    const firstLine=text.split('\n')[0].replace(/\s+/g,' ');
+    const issue=await gh('/issues',{method:'POST',body:{title:short(firstLine,90),body:text+'\n\n<!-- agent-office:task -->',labels:['agent-task','agent:'+agent,'mode:'+mode,mode==='power'?'status:needs-approval':'status:queued',...(revSel.value&&revSel.value!==agent?['review:'+revSel.value]:[])]}});
+    $('cmdText').value='';toast(`มอบหมายให้ ${byId[agent].name} แล้ว (#${issue.number})`);
+    await refresh();openTask(issue.number);
+  }catch(err){toast('ส่งงานไม่สำเร็จ: '+err.message);}
+  finally{btn.disabled=false;btn.textContent='สั่งงาน';}
+});
+$('cmdText').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();$('cmdForm').requestSubmit();}});
+
+// ================= MARKDOWN =================
+function inline(x){return esc(x).replace(/`([^`]+)`/g,'<code class="i">$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');}
+function mdText(src){const lines=src.split('\n');let html='',list=null;const close=()=>{if(list){html+=`</${list}>`;list=null;}};
+  for(const raw of lines){const l=raw.trimEnd();let m;if(!l.trim()){close();continue;}
+    if((m=l.match(/^(#{1,4})\s+(.*)/))){close();const lv=Math.min(4,Math.max(2,m[1].length+1));html+=`<h${lv}>${inline(m[2])}</h${lv}>`;continue;}
+    if((m=l.match(/^\s*[-*•]\s+(.*)/))){if(list!=='ul'){close();html+='<ul>';list='ul';}html+=`<li>${inline(m[1])}</li>`;continue;}
+    if((m=l.match(/^\s*\d+[.)]\s+(.*)/))){if(list!=='ol'){close();html+='<ol>';list='ol';}html+=`<li>${inline(m[1])}</li>`;continue;}
+    if((m=l.match(/^>\s?(.*)/))){close();html+=`<p style="color:var(--warn)">${inline(m[1])}</p>`;continue;}
+    if((m=l.match(/^\{\{sub\}\}(.*)/))){close();html+=`<p class="sub">${inline(m[1])}</p>`;continue;}
+    if(l.startsWith('|')){close();html+=`<p style="font-family:var(--f-mono);font-size:12px;white-space:pre-wrap">${inline(l)}</p>`;continue;}
+    close();html+=`<p>${inline(l)}</p>`;}close();return html;}
+const codeStore=[];
+function md(text){
+  text=text.replace(/<!--[\s\S]*?-->/g,'').replace(/<details><summary>(.*?)<\/summary>/g,'\n#### $1\n').replace(/<\/details>/g,'').replace(/<sub>(.*?)<\/sub>/g,'{{sub}}$1');
+  let html='',pos=0;const re=/```([\w#+.-]*)[^\n]*\n([\s\S]*?)(```|$)/g;let m;
+  while((m=re.exec(text))){html+=mdText(text.slice(pos,m.index));const id=codeStore.push(m[2])-1;
+    html+=`<div class="code"><div class="ch"><span class="fn">${esc(m[1]||'text')}</span><button type="button" class="btn sm" data-copy="${id}">Copy</button></div><pre>${esc(m[2])}</pre></div>`;
+    pos=m.index+m[0].length;if(!m[3])break;}
+  return html+mdText(text.slice(pos));}
+
+// ================= DRAWER =================
+let openNum=null,detail=null,detailTimer=null;
+function openTask(n){openNum=n;$('drawer').hidden=false;$('drawer').innerHTML='<div class="d-body"><div class="live"><i></i>กำลังโหลด…</div></div>';loadDetail();clearInterval(detailTimer);detailTimer=setInterval(()=>{const x=tasks.find(k=>k.num===openNum);if(x&&(x.status==='running'||x.status==='queued'))loadDetail();},4000);}
+function closeTask(){openNum=null;detail=null;clearInterval(detailTimer);$('drawer').hidden=true;}
+async function loadDetail(){
+  const n=openNum;if(!n)return;
+  try{const comments=await gh(`/issues/${n}/comments?per_page=100`);if(openNum!==n)return;detail={num:n,comments};renderDrawer();}
+  catch(e){toast('โหลดรายละเอียดไม่สำเร็จ: '+e.message);}
+}
+function renderDrawer(){
+  const tk=tasks.find(x=>x.num===openNum);if(!tk||!detail)return;
+  const a=byId[tk.agent]||AGENTS[0],el=$('drawer'),body=el.querySelector('.d-body');
+  const atBottom=body&&body.scrollHeight-body.scrollTop-body.clientHeight<40,prevTop=body?body.scrollTop:0,prevNum=el.dataset.n,draft=$('followText')?$('followText').value:'';
+  if(codeStore.length>3000)codeStore.length=0;
+  let h=`<div class="d-head"><div class="grow"><div class="who" style="color:${a.color}">${a.name} · ${esc(a.engineLabel||a.role)} · ${tk.mode.toUpperCase()}${tk.reviewer&&byId[tk.reviewer]?` <span style="color:${byId[tk.reviewer].color}">→ ตรวจทานโดย ${esc(byId[tk.reviewer].name)}</span>`:''}</div><h3>#${tk.num} ${esc(tk.title)}</h3></div><span class="pill ${tk.status}">${STXT[tk.status]||tk.status}</span><button type="button" class="btn sm" data-close>ปิด</button></div><div class="d-body">`;
+  h+=`<div class="turn user"><div class="lbl">คำสั่ง</div><div class="content">${esc(tk.body.replace(/<!--[\s\S]*?-->/g,'').trim())}</div></div>`;
+  for(const c of detail.comments){
+    if((c.body||'').startsWith(MARK)){const mm=(c.body.match(/agent:([\w-]+)/)||[])[1],kind=(c.body.match(/kind:(\w+)/)||[])[1],ca=byId[mm]||{name:mm||'agent',color:'#8fb3d9',engineLabel:''};
+      h+=`<div class="turn"><div class="lbl" style="color:${ca.color}">${kind==='review'?'🔍 ตรวจทานโดย ':''}${esc(ca.name)}${ca.engineLabel?' · '+esc(ca.engineLabel):''} · ${ago(Date.parse(c.updated_at))}</div><div class="md">${md(c.body)}</div></div>`;}
+    else h+=`<div class="turn user"><div class="lbl">สั่งเพิ่ม · ${ago(Date.parse(c.created_at))}</div><div class="content">${esc(c.body||'')}</div></div>`;
+  }
+  if(tk.status==='queued')h+=`<div class="live"><i></i>${workerOnline?'รอ worker รับงาน (ภายใน ~15 วินาที)':'เครื่องคอมฯ ออฟไลน์ งานจะเริ่มเมื่อ worker กลับมา'}</div>`;
+  if(tk.status==='approval')h+=`<div class="notice">งานโหมด POWER จะรันคำสั่งบนเครื่องคอมฯ ของคุณได้ ตรวจคำสั่งด้านบนแล้วกด "อนุมัติให้เริ่มงาน"</div>`;
+  h+='</div><div class="d-foot">';
+  const canFollow=tk.status==='done'||tk.status==='error'||tk.status==='cancel';
+  if(canFollow)h+=`<label for="followText" class="hint">สั่งแก้ไขหรือต่อยอด (agent จำบริบทเดิมของงานนี้)</label><textarea id="followText" rows="2" style="min-height:56px" placeholder="เช่น บันทึกผลเป็นไฟล์ CSV ด้วย"></textarea>`;
+  h+='<div class="d-actions">';
+  if(tk.status==='approval')h+=`<button type="button" class="btn warn sm" data-approve>อนุมัติให้เริ่มงาน</button>`;
+  if(canFollow)h+=`<button type="button" class="btn primary sm" data-follow>ส่งให้ ${a.name}</button><select id="handoffSel" aria-label="ส่งต่อให้ agent อื่น" style="flex:0 1 170px">${AGENTS.filter(x=>x.id!==tk.agent).map(x=>`<option value="${x.id}">${esc(x.name)} · ${esc(x.engineLabel)}</option>`).join('')}</select><button type="button" class="btn sm" data-handoff>ส่งต่อ</button>`;
+  if(tk.status==='error'||tk.status==='cancel')h+=`<button type="button" class="btn sm" data-retry>สั่งงานซ้ำ</button>`;
+  if(tk.status==='running'||tk.status==='queued'||tk.status==='approval')h+=`<button type="button" class="btn sm danger" data-cancel>ยกเลิกงาน</button>`;
+  h+=`<a class="btn sm" href="${esc(tk.url)}" target="_blank" rel="noopener">เปิดใน GitHub</a><span class="grow"></span>`;
+  if(tk.status!=='running')h+=`<button type="button" class="btn sm" data-close-issue>เก็บงาน</button>`;
+  h+='</div></div>';
+  el.innerHTML=h;el.dataset.n=tk.num;
+  if(draft&&$('followText'))$('followText').value=draft;
+  const nb=el.querySelector('.d-body');
+  if(prevNum==String(tk.num))nb.scrollTop=atBottom?nb.scrollHeight:prevTop;else nb.scrollTop=0;
+}
+async function copyText(txt){try{await navigator.clipboard.writeText(txt);toast('คัดลอกแล้ว');}catch(_){toast('คัดลอกไม่ได้ ให้เลือกข้อความแล้วคัดลอกเอง');}}
+$('drawer').addEventListener('click',async e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.hasAttribute('data-close')){closeTask();return;}
+  if(b.dataset.copy!==undefined){copyText(codeStore[+b.dataset.copy]||'');return;}
+  const tk=tasks.find(x=>x.num===openNum);if(!tk)return;
+  b.disabled=true;
+  try{
+    if(b.hasAttribute('data-approve')){await setStatus(tk,'queued');toast('อนุมัติแล้ว');}
+    else if(b.hasAttribute('data-cancel')){await setStatus(tk,'cancel');toast('ส่งคำขอยกเลิกแล้ว');}
+    else if(b.hasAttribute('data-handoff')){const to=byId[$('handoffSel').value];if(!to){b.disabled=false;return;}
+      const note=$('followText').value.trim()||'ช่วยทำต่อ/ตรวจสอบงานนี้จากผลงานที่มีอยู่';
+      await gh(`/issues/${tk.num}/comments`,{method:'POST',body:{body:`↪ ส่งต่อให้ ${to.name}: ${note}`}});
+      const keep=tk.labels.filter(l=>!l.startsWith('status:')&&!l.startsWith('agent:'));
+      await gh(`/issues/${tk.num}/labels`,{method:'PUT',body:{labels:[...keep,'agent:'+to.id,tk.mode==='power'?'status:needs-approval':'status:queued']}});
+      $('followText').value='';toast(`ส่งต่อให้ ${to.name} แล้ว`);}
+    else if(b.hasAttribute('data-retry')){await setStatus(tk,tk.mode==='power'?'needs-approval':'queued');toast('ส่งงานซ้ำแล้ว');}
+    else if(b.hasAttribute('data-follow')){const v=$('followText').value.trim();if(!v){$('followText').focus();b.disabled=false;return;}
+      await gh(`/issues/${tk.num}/comments`,{method:'POST',body:{body:v}});await setStatus(tk,tk.mode==='power'?'needs-approval':'queued');$('followText').value='';toast('ส่งคำสั่งเพิ่มแล้ว');}
+    else if(b.hasAttribute('data-close-issue')){await gh(`/issues/${tk.num}`,{method:'PATCH',body:{state:'closed'}});closeTask();toast('เก็บงานแล้ว (ยังเปิดดูได้ใน GitHub)');}
+    await refresh();if(openNum)loadDetail();
+  }catch(err){toast('ทำรายการไม่สำเร็จ: '+err.message);b.disabled=false;}
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&openNum)closeTask();});
+cv.addEventListener('click',e=>{const r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;let best=null,bd=40*Math.max(s,.7);
+  for(const a of AGENTS){const d=Math.hypot(a._sx-x,(a._sy+10*s)-y);if(d<bd){bd=d;best=a;}}
+  if(best){select(best.id);const busy=best.busy||best.waiting;if(busy)openTask(busy.num);}});
+let toastT=null;function toast(m){const el=$('toast');el.textContent=m;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,3500);}
+
+// ================= SETUP =================
+function openSetup(err){$('setup').hidden=false;if(conf){$('sOwner').value=conf.owner;$('sRepo').value=conf.repo;$('sToken').value=conf.token;}
+  const er=$('setupErr');er.hidden=!err;er.textContent=err||'';$('setupCancel').hidden=!conf;$('sOwner').focus();}
+$('settingsBtn').addEventListener('click',()=>openSetup());
+$('setupCancel').addEventListener('click',()=>{$('setup').hidden=true;});
+$('setupForget').addEventListener('click',()=>{try{localStorage.removeItem('ao.conf');}catch(_){}conf=null;tasks=[];etags.clear();onTasks([]);openSetup('ลบข้อมูลการเชื่อมต่อจากเครื่องนี้แล้ว');});
+$('setupForm').addEventListener('submit',async e=>{
+  e.preventDefault();const next={owner:$('sOwner').value.trim(),repo:$('sRepo').value.trim(),token:$('sToken').value.trim()};
+  const old=conf;conf=next;
+  try{const repo=await gh('');
+    try{localStorage.setItem('ao.conf',JSON.stringify(conf));}catch(_){}
+    $('setup').hidden=true;$('subline').textContent=`${conf.owner}/${conf.repo}${repo.private?' · private':' · ⚠ repo เป็น public'}`;
+    etags.clear();chatIssue=null;await refresh();await refreshWorker();await loadChat();toast('เชื่อมต่อแล้ว');
+  }catch(err){conf=old;const er=$('setupErr');er.hidden=false;er.textContent=err.status===401?'token ไม่ถูกต้องหรือหมดอายุ':err.status===404?'ไม่พบ repo หรือ token ไม่มีสิทธิ์เข้าถึง repo นี้':'เชื่อมต่อไม่สำเร็จ: '+err.message;}
+});
+
+// ================= VISION CHAT =================
+let chatIssue=null,chatComments=[],lastVisionId=null,chatLoaded=false,chatSending=false,chatNewArm=false,tab='vision';
+try{tab=localStorage.getItem('ao.tab')||'vision';}catch(_){}
+function setTab(name){tab=name;try{localStorage.setItem('ao.tab',name);}catch(_){}
+  for(const b of document.querySelectorAll('.tab')){const on=b.dataset.tab===name;b.classList.toggle('on',on);b.setAttribute('aria-selected',on);}
+  $('tabVision').hidden=name!=='vision';$('tabDirect').hidden=name!=='direct';if(name==='vision')scrollChat(true);}
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+const marker=c=>{const m=(c.body||'').match(/^<!-- agent-office:worker([^>]*)-->/);const o={};if(m)for(const kv of m[1].trim().split(/\s+/)){const i=kv.indexOf(':');if(i>0)o[kv.slice(0,i)]=kv.slice(i+1);}return o;};
+async function loadChat(){
+  if(!conf)return;
+  try{
+    if(!chatIssue||chatIssue.state!=='open'){const f=await gh('/issues?labels=vision-chat&state=open&per_page=1');chatIssue=f[0]||null;}
+    else chatIssue=await gh(`/issues/${chatIssue.number}`);
+    if(!chatIssue){chatComments=[];renderChat();return;}
+    const last=Math.max(1,Math.ceil((chatIssue.comments||0)/100));
+    let list=await gh(`/issues/${chatIssue.number}/comments?per_page=100&page=${last}`);
+    if(last>1&&list.length<30)list=[...await gh(`/issues/${chatIssue.number}/comments?per_page=100&page=${last-1}`),...list];
+    const prevLast=lastVisionId;chatComments=list;
+    const vis=list.filter(c=>marker(c).agent==='vision');const lv=vis[vis.length-1];
+    V.typing=!!(lv&&marker(lv).status==='running');
+    const done=[...vis].reverse().find(c=>marker(c).status&&marker(c).status!=='running');
+    if(done&&done.id!==prevLast){lastVisionId=done.id;if(chatLoaded)onVisionReply(done);}
+    chatLoaded=true;renderChat();
+  }catch(e){if(e.status!==304)$('chatHint').textContent='โหลดแชทไม่สำเร็จ: '+e.message;}
+}
+async function onVisionReply(c){
+  const m=marker(c),first=(c.body.replace(/<!--[\s\S]*?-->/g,'').trim().split('\n').find(l=>l.trim())||'').replace(/[#*`>]/g,'').trim();
+  V.bubble={text:short(first||'รับทราบครับ',34),until:t+5};
+  if(m.tasks)await refresh();
+  for(const n of (m.tasks||'').split(',').filter(Boolean)){
+    const tk=tasks.find(x=>x.num===+n);const a=tk&&byId[tk.agent];
+    if(a){packets.push({fx:CORE.x,fy:CORE.y,tx:a.seat.x,ty:a.seat.y,p:0,c:a.color});later(1.5,()=>say(a,'รับทราบ ✔',2.2));}
+  }
+}
+function chipFor(n){
+  const tk=tasks.find(x=>x.num===n);
+  if(!tk)return `<button type="button" class="tchip" data-n="${n}"><span class="n">#${n}</span><span class="tt">ดูใน GitHub (เก็บแล้วหรือยังไม่โหลด)</span></button>`;
+  const a=byId[tk.agent]||{name:tk.agent,color:'#8fb3d9'};
+  return `<button type="button" class="tchip" data-n="${n}" style="--c:${a.color}"><span class="n">#${n}</span><span class="a">${esc(a.name)}</span><span class="tt">${esc(tk.title)}</span>${tk.status==='approval'?`<span class="btn warn sm" role="button" tabindex="0" data-approve-n="${n}">อนุมัติ</span>`:`<span class="pill ${tk.status}">${STXT[tk.status]||tk.status}</span>`}</button>`;
+}
+function renderChat(){
+  const log=$('chatLog');const atBottom=log.scrollHeight-log.scrollTop-log.clientHeight<60;
+  if(!conf){log.innerHTML='<p class="chat-empty">เชื่อมต่อ GitHub ก่อน แล้ว VISION จะพร้อมคุยกับคุณ</p>';return;}
+  if(!chatIssue){log.innerHTML=`<p class="chat-empty">${workerOnline?'กำลังเตรียมห้องแชท…':'ยังไม่มีห้องแชท เริ่ม worker บนเครื่องคอมฯ แล้ว VISION จะเปิดห้องให้อัตโนมัติ หรือพิมพ์ข้อความแรกได้เลย'}</p>`;return;}
+  if(codeStore.length>3000)codeStore.length=0;
+  let h='';
+  for(const c of chatComments){
+    const m=marker(c);
+    if(m.agent==='vision'){
+      let body=c.body.replace(/<!--[\s\S]*?-->/g,'').trim();const ids=(m.tasks||'').split(',').filter(Boolean).map(Number);
+      let extra='';const k=body.indexOf('**สิ่งที่ดำเนินการแล้ว**');
+      if(k>=0){const lines=body.slice(k).split('\n').slice(1).map(l=>l.replace(/^-\s*/,'').trim()).filter(Boolean);body=body.slice(0,k).trim();
+        const warn=lines.filter(l=>!/^#\d+/.test(l));extra=`<div class="tchips">${ids.map(chipFor).join('')}</div>`+(warn.length?`<div class="md">${mdText(warn.join('\n'))}</div>`:'');}
+      if(m.status==='running')h+=`<div class="msg v typing"><div class="who">${esc(V.name)}<span class="dots"><i></i><i></i><i></i></span></div><div class="md">${body.startsWith('✍️')?'':md(body)}</div></div>`;
+      else h+=`<div class="msg v${m.kind==='report'?' report':''}"><div class="who">${esc(V.name)}${m.kind==='report'?'<span>อัปเดตงาน</span>':''}<span>${ago(Date.parse(c.updated_at))}</span></div><div class="md">${md(body)}</div>${extra}</div>`;
+    }else if(!(c.body||'').startsWith(MARK)){
+      h+=`<div class="msg me">${esc((c.body||'').trim())}</div>`;
+    }
+  }
+  log.innerHTML=h||`<p class="chat-empty">เริ่มคุยกับ ${esc(V.name)} ได้เลย ถามเรื่องไอที สั่งงาน หรือให้ตามงานในทีม</p>`;
+  if(atBottom||!log.dataset.init){log.dataset.init='1';scrollChat(true);}
+}
+function scrollChat(force){const l=$('chatLog');if(force)l.scrollTop=l.scrollHeight;}
+$('chatLog').addEventListener('click',async e=>{
+  const ap=e.target.closest('[data-approve-n]');
+  if(ap){e.stopPropagation();const tk=tasks.find(x=>x.num===+ap.dataset.approveN);if(!tk)return;ap.textContent='…';try{await setStatus(tk,'queued');toast(`อนุมัติ #${tk.num} แล้ว`);await refresh();renderChat();}catch(err){toast('อนุมัติไม่สำเร็จ: '+err.message);}return;}
+  const ch=e.target.closest('.tchip');if(ch){const n=+ch.dataset.n;if(tasks.find(x=>x.num===n))openTask(n);else if(conf)window.open(`https://github.com/${conf.owner}/${conf.repo}/issues/${n}`,'_blank','noopener');return;}
+  const cp=e.target.closest('[data-copy]');if(cp)copyText(codeStore[+cp.dataset.copy]||'');
+});
+$('chatForm').addEventListener('submit',async e=>{
+  e.preventDefault();if(!conf){openSetup();return;}
+  const text=$('chatText').value.trim();if(!text||chatSending)return;
+  chatSending=true;$('chatSend').disabled=true;
+  try{
+    if(!chatIssue){chatIssue=await gh('/issues',{method:'POST',body:{title:'💬 คุยกับ VISION',labels:['vision-chat'],body:'ห้องแชทกับ VISION เลขาของทีม AI Agent'}});}
+    const c=await gh(`/issues/${chatIssue.number}/comments`,{method:'POST',body:{body:text}});
+    $('chatText').value='';chatComments.push(c);V.typing=true;renderChat();scrollChat(true);
+    if(!workerOnline)toast('เครื่องคอมฯ ออฟไลน์ VISION จะตอบเมื่อ worker กลับมา');
+    setTimeout(loadChat,1500);
+  }catch(err){toast('ส่งข้อความไม่สำเร็จ: '+err.message);}
+  finally{chatSending=false;$('chatSend').disabled=false;$('chatText').focus();}
+});
+$('chatText').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('chatForm').requestSubmit();}});
+$('chatNew').addEventListener('click',async()=>{
+  if(!chatIssue)return;
+  if(!chatNewArm){chatNewArm=true;$('chatNew').textContent='กดอีกครั้งเพื่อยืนยัน';setTimeout(()=>{chatNewArm=false;$('chatNew').textContent='เริ่มบทสนทนาใหม่';},4000);return;}
+  chatNewArm=false;$('chatNew').textContent='เริ่มบทสนทนาใหม่';
+  try{await gh(`/issues/${chatIssue.number}`,{method:'PATCH',body:{state:'closed'}});
+    chatIssue=await gh('/issues',{method:'POST',body:{title:'💬 คุยกับ VISION',labels:['vision-chat'],body:'ห้องแชทกับ VISION เลขาของทีม AI Agent'}});
+    chatComments=[];lastVisionId=null;renderChat();toast('เริ่มบทสนทนาใหม่แล้ว (บทสนทนาเก่ายังอยู่ใน GitHub)');}
+  catch(err){toast('เริ่มใหม่ไม่สำเร็จ: '+err.message);}
+});
+
+// ================= BOOT =================
+new ResizeObserver(resize).observe(cv);resize();
+let last=performance.now(),uiAcc=0;
+function frame(now){const dt=Math.min(0.05,(now-last)/1000);last=now;update(dt);render();uiAcc+=dt;if(uiAcc>0.25){uiAcc=0;renderRoster();}requestAnimationFrame(frame);}
+requestAnimationFrame(frame);
+renderBoard();
+setTab(tab);
+if(!conf){openSetup();renderChat();}else{$('subline').textContent=`${conf.owner}/${conf.repo}`;refresh();refreshWorker();loadChat();}
+let pollT=0;setInterval(()=>{pollT++;const fast=!document.hidden;if(fast||pollT%4===0)refresh();if(pollT%6===0)refreshWorker();},8000);
+let chatT=0;setInterval(()=>{chatT++;if(!conf)return;const fast=!document.hidden&&(tab==='vision'||V.typing);if(fast||chatT%5===0)loadChat();},3000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){refresh();refreshWorker();}});
+})();
+</script>
+</body>
+</html>
